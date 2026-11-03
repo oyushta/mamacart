@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MamaCart</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #222; }
+    form { display: flex; gap: .5rem; }
+    input { flex: 1; padding: .6rem; font-size: 1rem; }
+    button { padding: .6rem 1rem; font-size: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1.5rem; }
+    th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #ddd; }
+    .own { color: #0a6; font-size: .85rem; }
+    .muted { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>MamaCart</h1>
+  <form id="search-form">
+    <input id="q" placeholder="e.g. 2L semi-skimmed milk" required minlength="2">
+    <button type="submit">Compare</button>
+  </form>
+  <div id="results"></div>
+
+  <script>
+    const form = document.getElementById("search-form");
+    const results = document.getElementById("results");
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    }
+
+    function row(p) {
+      const unit = p.unit_price !== null ? `${p.unit_price.toFixed(2)} ${esc(p.unit_label)}` : "—";
+      const tag = p.own_brand ? ' <span class="own">own brand</span>' : "";
+      return `<tr>
+        <td>${esc(p.store)}</td>
+        <td>${esc(p.name)}${tag}</td>
+        <td>€${p.price.toFixed(2)}</td>
+        <td>${unit}</td>
+      </tr>`;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const q = document.getElementById("q").value.trim();
+      results.innerHTML = '<p class="muted">Searching…</p>';
+      try {
+        const res = await fetch(`/search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) throw new Error(res.statusText);
+        const data = await res.json();
+        if (!data.matches.length) {
+          results.innerHTML = '<p class="muted">No matches yet. Scrapers may not be implemented.</p>';
+          return;
+        }
+        let html = `<table><thead><tr><th>Store</th><th>Product</th><th>Price</th><th>Unit price</th></tr></thead><tbody>`;
+        html += data.matches.map(row).join("");
+        html += "</tbody></table>";
+        if (data.alternatives.length) {
+          html += `<h2>Cheaper alternatives</h2><table><tbody>${data.alternatives.map(row).join("")}</tbody></table>`;
+        }
+        results.innerHTML = html;
+      } catch (err) {
+        results.innerHTML = `<p>Search failed: ${esc(err.message)}</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
